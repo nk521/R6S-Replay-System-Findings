@@ -28,7 +28,7 @@ union WindowDescriptor {
 	WindowDescriptorBitfield bits;
 };
 
-bitfield BlockBitfield {
+bitfield BlockHeaderBitfield {
 	last_block : 1;
 	block_type : 2;
 	block_size : 21;
@@ -56,13 +56,13 @@ struct ZSTD {
 	// https://datatracker.ietf.org/doc/html/rfc8878#section-3.1.1.1.1.6
 	if ((frameHeaderDescriptor.value & 3) == 1) {
 		u8 didFieldSize;
-		padding[readUnsigned(didFieldSize)];
+		padding[std::readUnsigned(didFieldSize,2)];
 	} else if ((frameHeaderDescriptor.value & 3) == 2) {
 		u16 didFieldSize;
-		padding[readUnsigned(didFieldSize)];
+		padding[std::readUnsigned(didFieldSize,2)];
 	} else if ((frameHeaderDescriptor.value & 3) == 3) {
 		u32 didFieldSize;
-		padding[readUnsigned(didFieldSize)];
+		padding[std::readUnsigned(didFieldSize,2)];
 	} else {
 	}
 
@@ -71,19 +71,24 @@ struct ZSTD {
 		WindowDescriptor windowDescriptor;
 	}
 
-	BlockBitfield block;
-	padding[
+	BlockHeaderBitfield blockHeader [[color("FF000FFF")]];
+
+	u8 frameData[
 		(
 			(
-				(readUnsigned(addressof(block) + 0, 2) << 0x0) + 
-				(readUnsigned(addressof(block) + 1, 2) << 0x08) + 
-				(readUnsigned(addressof(block) + 2, 2) << 0x10)
+				(std::readUnsigned(addressof(blockHeader) + 0, 1) << 0) + 
+				(std::readUnsigned(addressof(blockHeader) + 1, 1) << 8) + 
+				(std::readUnsigned(addressof(blockHeader) + 2, 1) << 16)
 			) >> 3
 		)
 	];
+	
+	// https://datatracker.ietf.org/doc/html/rfc8878#section-3.1.1.1.1.5
+	if (frameHeaderDescriptor.value & 20) {
+		u32 checksum [[color("F0F0F0FF")]];
+	}
 
-	u32 comment;
 	
 };
 
-ZSTD zstd @ $;
+ZSTD zstd @ std::findSequence(1, 0x28, 0xB5, 0x2F, 0xFD);
